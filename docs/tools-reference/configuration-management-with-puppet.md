@@ -22,13 +22,13 @@ In this guide, we'll explore how to use Puppet to manage various aspects of a Li
 Installing Puppet
 -------------------
 
-Whether you're on an RPM-based distribution like CentOS or an APT-based one such as Ubuntu, Puppet Labs provides package repositories to make installing and upgrading puppet easier. Puppet Labs has [instructions regarding how to install each](https://docs.puppetlabs.com/guides/puppetlabs_package_repositories.html#open-source-repositories), but here's the abbreviate versions:
+Whether you're on an `rpm` based distribution like CentOS or an `deb` based one such as Ubuntu, Puppet Labs provides package repositories to make installing and upgrading puppet easier. Puppet Labs has [instructions regarding how to install each](https://docs.puppetlabs.com/guides/puppetlabs_package_repositories.html#open-source-repositories), but here's the abbreviated versions:
 
 ### RPM Based Distributions
 
 If you're on a CentOS machine, determine which major version the operating system is (you can usually look in `/etc/redhat-release` to find it.) Use that major version in the following command. For example, if you are running CentOS 6:
 
-    sudo rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-7.noarch.rpm
+    sudo rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-6.noarch.rpm
 
 This command will install the Puppet Labs yum repository in `/etc/yum.repos.d`. The format is similar for Fedora: find the major version, and use a command like the following example, which installs the Puppet Labs repo for Fedora 20:
 
@@ -75,7 +75,7 @@ From this point on, the following examples should be entered into `/etc/puppet/m
 Managing Built-In Resources
 ---------------------------
 
-In Puppet, there are many types of built-in resources that Puppet already knows how to manage (to see every type that puppet natively supports, see [the puppet type reference documentation](https://docs.puppetlabs.com/references/latest/type.html).) We'll look at a few simple examples using some common resource types.
+In Puppet, there are many types of built-in resources that Puppet already knows how to manage (to see every type that puppet natively supports, read [the puppet type reference documentation](https://docs.puppetlabs.com/references/latest/type.html).) We'll look at a few simple examples using some common resource types.
 
 ### Creating and Managing Users
 
@@ -86,13 +86,13 @@ By 'declaring' a user resource, puppet ensures that your system is in the state 
         managehome => true,
     }
 
-`'ensure'` tells puppet to make sure the user is there, and `'managehome'` indicates puppet should make sure the users home directory is present and configured with the right permissions. Then tell puppet to apply the manifest:
+`'ensure'` tells puppet to make sure the user is there, and `'managehome'` indicates puppet should make sure the user's home directory is present and configured with the right permissions. Then tell puppet to apply the manifest:
 
     sudo puppet apply /etc/puppet/manifests/site.pp
 
 You'll notice output indicating that puppet has created the user. Try executing `ls /home/` to see if a home directory for `alice` has been created.
 
-We have a user on our system managed by puppet! What if we want to change something about the user later on? If we edit the existing manifest to add an option for the type, puppet will find the existing user and only make the changes needed. In this example, we'll add the `'password'` attribute (this is a `crypt`-hashed password for the string `'hunter2'`):
+We have a user on our system managed by puppet! What if we want to change something about the user later on? If we edit the existing manifest to add an option for the user resource, puppet will find the existing user and only make the changes needed. In this example, we'll add the `'password'` attribute (this is a `crypt`-hashed password for the string `'hunter2'`):
 
     user { 'alice':
         ensure => 'present',
@@ -104,7 +104,7 @@ And re-apply the manifest:
 
     sudo puppet apply /etc/puppet/manifests/site.pp
 
-Puppet doesn't recreate the user, just edits the existing user to add the password `'hunter2'`. This is one of puppet's strengths: it evaluates the current state of the system and only performs operations that are required by comparing the *catalog* (the results of compiling the manifest) against the current state of the operating system.
+Puppet doesn't recreate the user, just edits the existing user to add the password `'hunter2'`. This is one of puppet's strengths: it evaluates the current state of the system and only performs operations that are required by comparing the *catalog* (the results of compiling the manifest) against the current state of the operating system. If you were to re-run the `apply` command, puppet would run quickly and not modify the system at all, because the `alice` user's state matches the one you're asking for in the puppet manifest.
 
 ### Installing Packages
 
@@ -179,3 +179,25 @@ Note that this may take some time for docker to pull the image you've defined.
 If everything went smoothly, you should have an ubuntu container up and running, printing the date every ten seconds. Try watching the logs:
 
     sudo docker logs -f docker-test
+
+Let's change the `docker::run` resource to ensure that the container is *not* running anymore to clean up after ourselves:
+
+    docker::run { 'docker_test':
+        running => false,
+        image => 'ubuntu',
+        command => '/bin/bash -c "while true ; do echo The time is `date`. ; sleep 10 ; done"',
+        require => Docker::Image['ubuntu'],
+    }
+
+Note the `running => false` line. Re-apply the manifest will halt the container.
+
+Let's summarize the strengths of this setup:
+
+* There is a single file defining the setup we want: a user with a password, git installed and up-to-date, and a docker container up and running.
+* All of these resources are *cross-distribution*, that is, your `site.pp` can be applied to Fedora, CentOS, or Ubuntu without modifications and should still end up with the same end state.
+* The only knowledge we had to acquire was to install puppet, run puppet, and write a puppet manifest. The details of user commands, software packages, and how to start and run docker are handled by puppet under the hood.
+
+Going Further
+-------------
+
+This example is a simple deployment of *masterless* puppet: we did not set up a puppet *master*, which allows you to 
